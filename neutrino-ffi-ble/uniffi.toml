@@ -1,0 +1,21 @@
+[bindings.kotlin]
+# Own package, NOT io.element.neutrino: uniffi emits its runtime scaffolding
+# (RustBuffer, FfiConverterString, UniffiHandleMap, …) into EVERY generated
+# file, so two namespaces sharing one Kotlin package redeclare all of it and
+# kotlinc fails. The ffi types this crate uses (NeutrinoConfig, NeutrinoHandle)
+# are imported from the ffi namespace's package via external_packages below.
+package_name = "io.element.neutrino.ble"
+# "neutrino", NOT this crate's lib target name ("neutrino_ble"): uniffi takes
+# each namespace's load name from that crate's uniffi.toml, not from the
+# library file bindgen ran over — so neutrino.kt (generated from neutrino-ffi's
+# config) loads "neutrino" no matter what. The .aar build therefore renames the
+# built cdylib to libneutrino.so in jniLibs (see build-aar.sh), and this pin
+# makes our own namespace load the same file. NativeBle.kt and the consuming
+# app keep loading "neutrino" unchanged.
+cdylib_name = "neutrino"
+android_cleaner = true
+omit_checksums = true
+
+[bindings.kotlin.external_packages]
+# Crate/namespace name → the Kotlin package its bindings live in.
+neutrino = "io.element.neutrino"
