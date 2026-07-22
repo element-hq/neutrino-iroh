@@ -86,7 +86,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/element-hq/neutrino")
+            url = uri("https://maven.pkg.github.com/element-hq/neutrino-iroh")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                 password = System.getenv("GITHUB_TOKEN")
