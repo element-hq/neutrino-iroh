@@ -48,7 +48,10 @@ pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
     let factory: neutrino_main::FederationLinkFactory = Box::new(move |ctx| {
         Box::pin(async move {
             let transport = IrohTransport::bind(ctx, RELAY_BIND).await?;
-            Ok(transport as std::sync::Arc<dyn neutrino_main::DatagramLink>)
+            Ok(neutrino_main::FederationLink {
+                link: transport as std::sync::Arc<dyn neutrino_main::DatagramLink>,
+                key_resolver: Some(std::sync::Arc::new(neutrino_main::NodeIdKeyResolver)),
+            })
         })
     });
     neutrino::start_with(config, Some(factory))
