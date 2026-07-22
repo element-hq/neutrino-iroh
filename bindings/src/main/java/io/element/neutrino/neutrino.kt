@@ -1650,6 +1650,11 @@ data class NeutrinoConfig (
     var `outboundConcurrency`: kotlin.UInt
     , 
     /**
+     * Whether the network is trusted and hence whether we can drop signatures
+     */
+    var `trustedNetwork`: kotlin.Boolean
+    , 
+    /**
      * When set, runs the in-process `neutrino-lb` CoAP low-bandwidth sidecar.
      * This is the public federation port the ingress binds — peers'
      * `server_name` resolves to `host(bind_addr):lb_federation_port`. The
@@ -1677,6 +1682,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalUShort.read(buf),
         )
     }
@@ -1686,6 +1692,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterString.allocationSize(value.`localpart`) +
             FfiConverterString.allocationSize(value.`storageDir`) +
             FfiConverterUInt.allocationSize(value.`outboundConcurrency`) +
+            FfiConverterBoolean.allocationSize(value.`trustedNetwork`) +
             FfiConverterOptionalUShort.allocationSize(value.`lbFederationPort`)
     )
 
@@ -1694,6 +1701,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterString.write(value.`localpart`, buf)
             FfiConverterString.write(value.`storageDir`, buf)
             FfiConverterUInt.write(value.`outboundConcurrency`, buf)
+            FfiConverterBoolean.write(value.`trustedNetwork`, buf)
             FfiConverterOptionalUShort.write(value.`lbFederationPort`, buf)
     }
 }

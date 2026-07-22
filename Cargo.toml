@@ -30,8 +30,3 @@ uniffi = { version = "0.31.1" }
 # a full 32-byte node id plus a display name in one extended advertisement — the
 # stock 0.2.3 only exposes `local_name` + `service_uuids` over legacy adverts.
 blew = { path = "./vendor/blew" }
-# The remaining entries mirror the main neutrino workspace's [patch.crates-io]:
-# a [patch] table only applies from the workspace root it is written in, so the
-# patches the path-dependencies (neutrino-lb et al) rely on must be repeated
-# here verbatim.
-async-compat = { git = "https://github.com/element-hq/async-compat", rev = "5a27c8b290f1f1dcfc0c4ec22c464e38528aa591" }
