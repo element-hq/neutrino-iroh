@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: stable
+          targets: armv7-linux-androideabi,aarch64-linux-android,i686-linux-android,x86_64-linux-android
+      - uses: nttld/setup-ndk@2817442ee7c3346c1eb7d2ec60263c93206ba14f
+        with:
+          ndk-version: r27c
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17'
+      # Host build (for uniffi binding generation) compiles blew's bluer
+      # backend, which needs system D-Bus. Not required in the main repo — the
+      # LAN medium has no Bluetooth stack.
+      - name: Install libdbus
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
+      - run: cargo install cargo-ndk
+      - name: Record neutrino commit
+        run: |
+          sha="$(grep -oE 'github\.com/element-hq/neutrino[^#]*#[0-9a-f]{40}' Cargo.lock | grep -oE '[0-9a-f]{40}$' | head -1)"
+          echo "neutrino dep commit: $sha"
+          {
+            echo "### Release ${GITHUB_REF_NAME}"
+            echo "- neutrino dep commit: \`${sha}\`"
+            echo "- source: https://github.com/element-hq/neutrino/commit/${sha}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish bindings to GitHub Packages
+        run: ./build-aar.sh --publish --version "${GITHUB_REF_NAME#v}"
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}

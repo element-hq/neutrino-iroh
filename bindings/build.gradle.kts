@@ -66,9 +66,23 @@ publishing {
                 from(components["release"])
             }
 
+            // The upstream neutrino commit this .aar was compiled against,
+            // passed by build-aar.sh from Cargo.lock. Baked into the POM so a
+            // published artifact carries its own source provenance.
+            val neutrinoCommit = (findProperty("neutrinoCommit") as String?) ?: "unknown"
+
             pom {
                 name.set("Neutrino")
-                description.set("Lightweight, embeddable homeserver written in Rust")
+                description.set("Lightweight, embeddable homeserver written in Rust (neutrino @ $neutrinoCommit)")
+
+                // Machine-readable copy of the same commit for tooling.
+                properties.set(mapOf("neutrino.commit" to neutrinoCommit))
+
+                scm {
+                    url.set("https://github.com/element-hq/neutrino")
+                    connection.set("scm:git:https://github.com/element-hq/neutrino.git")
+                    tag.set(neutrinoCommit)
+                }
 
                 licenses {
                     license {
@@ -86,7 +100,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/element-hq/neutrino")
+            url = uri("https://maven.pkg.github.com/element-hq/neutrino-iroh")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                 password = System.getenv("GITHUB_TOKEN")
