@@ -32,6 +32,15 @@ jobs:
       - name: Install libdbus
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
       - run: cargo install cargo-ndk
+      - name: Record neutrino commit
+        run: |
+          sha="$(grep -oE 'github\.com/element-hq/neutrino[^#]*#[0-9a-f]{40}' Cargo.lock | grep -oE '[0-9a-f]{40}$' | head -1)"
+          echo "neutrino dep commit: $sha"
+          {
+            echo "### Release ${GITHUB_REF_NAME}"
+            echo "- neutrino dep commit: \`${sha}\`"
+            echo "- source: https://github.com/element-hq/neutrino/commit/${sha}"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Publish bindings to GitHub Packages
         run: ./build-aar.sh --publish --version "${GITHUB_REF_NAME#v}"
         env:

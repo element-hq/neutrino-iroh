@@ -14,6 +14,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# The exact neutrino commit this .aar is built against, read from the lockfile
+# (the resolved sha after '#', not the requested `rev`, which may be short or a
+# tag). Baked into the published POM via -PneutrinoCommit and echoed, so every
+# build — local or CI — records which upstream neutrino it was compiled with.
+NEUTRINO_COMMIT="$(grep -oE 'github\.com/element-hq/neutrino[^#]*#[0-9a-f]{40}' Cargo.lock | grep -oE '[0-9a-f]{40}$' | head -1)"
+echo "neutrino commit: ${NEUTRINO_COMMIT:-unknown}"
+
 ABIS=(${ABIS:-armeabi-v7a arm64-v8a x86 x86_64})
 GRADLE_TASK=":bindings:assembleRelease"
 VERSION=""
@@ -66,5 +73,6 @@ cargo run -p uniffi-bindgen -- generate --library "$host_lib" \
 # 4. Package / publish the .aar (version property matches xtask publish).
 gradle_args=("$GRADLE_TASK")
 [ -n "$VERSION" ] && gradle_args+=("-PneutrinoVersion=$VERSION")
+[ -n "$NEUTRINO_COMMIT" ] && gradle_args+=("-PneutrinoCommit=$NEUTRINO_COMMIT")
 ./gradlew "${gradle_args[@]}"
 [ "$GRADLE_TASK" = ":bindings:assembleRelease" ] && echo "aar: bindings/build/outputs/aar/"

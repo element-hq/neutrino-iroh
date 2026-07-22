@@ -39,6 +39,14 @@ pub(crate) const DISCOVERY_LOCALPART: &str = "n";
 /// `ble` feature, i.e. on device) discovers + reaches them over the BLE mesh.
 #[uniffi::export]
 pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
+    // Announce which upstream neutrino this .aar was compiled against (baked in
+    // by build.rs from the lockfile). Install the logcat subscriber first so the
+    // line is not dropped — idempotent, and start_with installs it again.
+    neutrino_main::init_tracing();
+    tracing::info!(
+        neutrino_commit = env!("NEUTRINO_COMMIT"),
+        "neutrino BLE medium starting"
+    );
     // iroh unifies reqwest's TLS backend to rustls with no default crypto
     // provider, so building the federation client would panic ("No rustls
     // crypto provider is configured"). The provider is a process-global the
