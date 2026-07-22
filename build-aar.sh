@@ -6,11 +6,12 @@
 # compiles blew's bluer backend for binding generation).
 #
 # Usage:
-#   ./build-aar.sh                                   # assembleRelease only
-#   ./build-aar.sh --publish-local --version 0.6.5   # ~ xtask publish --local
-#   ./build-aar.sh --publish --version 0.6.5         # GitHub Packages
-#                                                    # (needs GITHUB_ACTOR/TOKEN)
-#   ABIS="arm64-v8a" ./build-aar.sh                  # limit ABIs (default: all 4)
+#   ./build-aar.sh                                    # assembleRelease only
+#   ./build-aar.sh --publish-local --version 0.6.5    # ~ xtask publish --local
+#   ./build-aar.sh --publish --version 0.6.5          # GitHub Packages
+#                                                     # (needs GITHUB_ACTOR/TOKEN)
+#   ABIS="arm64-v8a" ./build-aar.sh                   # limit ABIs (default: all 4)
+
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -25,13 +26,13 @@ ABIS=(${ABIS:-armeabi-v7a arm64-v8a x86 x86_64})
 GRADLE_TASK=":bindings:assembleRelease"
 VERSION=""
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --publish-local) GRADLE_TASK=":bindings:publishToMavenLocal" ;;
-        --publish)       GRADLE_TASK=":bindings:publish" ;;
-        --version)       VERSION="$2"; shift ;;
-        *) echo "unknown arg: $1" >&2; exit 2 ;;
-    esac
-    shift
+  case "$1" in
+    --publish-local) GRADLE_TASK=":bindings:publishToMavenLocal" ;;
+    --publish) GRADLE_TASK=":bindings:publish" ;;
+    --version) VERSION="$2"; shift ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+  shift
 done
 
 # 1. Host build so uniffi-bindgen can load the cdylib. Must match the Android
@@ -44,15 +45,15 @@ cargo build -p neutrino-ffi-ble --release --features ble
 ndk_args=()
 for abi in "${ABIS[@]}"; do ndk_args+=(-t "$abi"); done
 cargo ndk -o ./bindings/src/main/jniLibs "${ndk_args[@]}" \
-    build -p neutrino-ffi-ble --release --features ble
+  build -p neutrino-ffi-ble --release --features ble
 
 # 2b. The cdylib target is `neutrino_ble` (it cannot share neutrino-ffi's lib
 #     name in one dependency graph), but every generated binding — and the
 #     consuming app's NativeBle/JNA lookups — loads "neutrino" (see
 #     neutrino-ffi-ble/uniffi.toml). Rename in place.
 for abi in "${ABIS[@]}"; do
-    mv "./bindings/src/main/jniLibs/$abi/libneutrino_ble.so" \
-       "./bindings/src/main/jniLibs/$abi/libneutrino.so"
+  mv "./bindings/src/main/jniLibs/$abi/libneutrino_ble.so" \
+     "./bindings/src/main/jniLibs/$abi/libneutrino.so"
 done
 
 # 3. Generate the Kotlin bindings (both namespaces: `neutrino` = the whole
@@ -61,18 +62,24 @@ done
 #    previously generated files first so a layout change can't leave stale
 #    redeclarations behind (NativeBle.kt is hand-written and kept).
 case "$(uname)" in
-    Darwin) host_lib=./target/release/libneutrino_ble.dylib ;;
-    *)      host_lib=./target/release/libneutrino_ble.so ;;
+  Darwin) host_lib=./target/release/libneutrino_ble.dylib ;;
+  *) host_lib=./target/release/libneutrino_ble.so ;;
 esac
 rm -f ./bindings/src/main/java/io/element/neutrino/neutrino.kt \
       ./bindings/src/main/java/io/element/neutrino/neutrino_ble.kt
 rm -rf ./bindings/src/main/java/io/element/neutrino/ble
 cargo run -p uniffi-bindgen -- generate --library "$host_lib" \
-    --language kotlin --out-dir ./bindings/src/main/java
+  --language kotlin --out-dir ./bindings/src/main/java
 
 # 4. Package / publish the .aar (version property matches xtask publish).
 gradle_args=("$GRADLE_TASK")
 [ -n "$VERSION" ] && gradle_args+=("-PneutrinoVersion=$VERSION")
 [ -n "$NEUTRINO_COMMIT" ] && gradle_args+=("-PneutrinoCommit=$NEUTRINO_COMMIT")
+# maven-publish / AGP publication tasks aren't configuration-cache compatible;
+# with CC enabled the build succeeds but the invocation still exits non-zero.
+# Disable the config cache for the publish paths only (assembleRelease keeps it).
+case "$GRADLE_TASK" in
+  *publish*) gradle_args+=(--no-configuration-cache) ;;
+esac
 ./gradlew "${gradle_args[@]}"
 [ "$GRADLE_TASK" = ":bindings:assembleRelease" ] && echo "aar: bindings/build/outputs/aar/"
