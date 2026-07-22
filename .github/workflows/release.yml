@@ -42,7 +42,7 @@ jobs:
             echo "- source: https://github.com/element-hq/neutrino/commit/${sha}"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Publish bindings to GitHub Packages
-        run: ./build-aar.sh --publish --version "${GITHUB_REF_NAME#v}"
+        run: ABIS='arm64-v8a x86_64' ./build-aar.sh --publish --version "${GITHUB_REF_NAME#v}"
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
