@@ -19,8 +19,8 @@ name = "neutrino_ble"
 # The composition targets: the FFI surface this crate re-exports an entrypoint
 # for, and the seam types (`FederationLinkFactory`, `LinkContext`,
 # `DatagramLink`).
-neutrino-ffi = { git = "https://github.com/element-hq/neutrino", rev = "ac8e32a81c9a201018486a6280a08006cabd1af5" } 
-neutrino-main = { git = "https://github.com/element-hq/neutrino", rev = "ac8e32a81c9a201018486a6280a08006cabd1af5" }
+neutrino-ffi = { git = "https://github.com/element-hq/neutrino", rev = "057373b058b7381b60c43e58dbf07b81c9e6a080" } 
+neutrino-main = { git = "https://github.com/element-hq/neutrino", rev = "057373b058b7381b60c43e58dbf07b81c9e6a080" }
 
 # `neutrino_main::DatagramLink` is an `#[async_trait]` trait we implement over iroh.
 async-trait.workspace = true

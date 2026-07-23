@@ -647,6 +647,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Short
     external fun uniffi_neutrino_checksum_method_neutrinohandle_kick_backoff(
     ): Short
+    external fun uniffi_neutrino_checksum_method_neutrinohandle_last_error(
+    ): Short
     external fun uniffi_neutrino_checksum_method_neutrinohandle_server_name(
     ): Short
     external fun uniffi_neutrino_checksum_method_neutrinohandle_shutdown(
@@ -685,6 +687,8 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_neutrino_fn_method_neutrinohandle_kick_backoff(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_neutrino_fn_method_neutrinohandle_last_error(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_neutrino_fn_method_neutrinohandle_server_name(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_neutrino_fn_method_neutrinohandle_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1248,6 +1252,17 @@ public interface NeutrinoHandleInterface {
     fun `kickBackoff`()
     
     /**
+     * The fatal error the server exited with, or `None` while it is starting or
+     * running normally. The host polls this alongside `server_name()`: a
+     * `Some(server_name)` means "ready", a `Some(last_error)` means "refused to
+     * start — show this message in a dialog". A non-blocking in-memory read
+     * (like `server_name`), safe to call from the FFI/JNI thread. Startup
+     * failures that used to only reach logcat (identity mismatch, bad config,
+     * bind failure) are now observable by the host.
+     */
+    fun `lastError`(): kotlin.String?
+    
+    /**
      * The server's resolved federation name — its derived node id, or `None`
      * until the server has booted and resolved its identity (so the host can
      * distinguish "not ready yet" from a value rather than racing on an empty
@@ -1455,6 +1470,28 @@ open class NeutrinoHandle: Disposable, AutoCloseable, NeutrinoHandleInterface
 
     
     /**
+     * The fatal error the server exited with, or `None` while it is starting or
+     * running normally. The host polls this alongside `server_name()`: a
+     * `Some(server_name)` means "ready", a `Some(last_error)` means "refused to
+     * start — show this message in a dialog". A non-blocking in-memory read
+     * (like `server_name`), safe to call from the FFI/JNI thread. Startup
+     * failures that used to only reach logcat (identity mismatch, bad config,
+     * bind failure) are now observable by the host.
+     */override fun `lastError`(): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_neutrino_fn_method_neutrinohandle_last_error(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * The server's resolved federation name — its derived node id, or `None`
      * until the server has booted and resolved its identity (so the host can
      * distinguish "not ready yet" from a value rather than racing on an empty
@@ -1642,6 +1679,17 @@ data class NeutrinoConfig (
     var `localpart`: kotlin.String
     , 
     /**
+     * The homeserver's federation `server_name` — the domain in
+     * `@localpart:server_name`. `None` (or an empty string) lets the server
+     * derive a stable name from its node identity, which is the embedded
+     * default; the host then reads the result back via
+     * `NeutrinoHandle::server_name()`. Set a concrete value to pin a specific
+     * name: it is recorded on first start and every later start under a
+     * different name is refused (see the server-name identity guard).
+     */
+    var `serverName`: kotlin.String?
+    , 
+    /**
      * Absolute path to a writable directory the host owns (e.g. Android's
      * `context.filesDir`). The DB is `<storage_dir>/neutrino.db`.
      */
@@ -1680,6 +1728,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
         return NeutrinoConfig(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterBoolean.read(buf),
@@ -1690,6 +1739,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
     override fun allocationSize(value: NeutrinoConfig) = (
             FfiConverterString.allocationSize(value.`bindAddr`) +
             FfiConverterString.allocationSize(value.`localpart`) +
+            FfiConverterOptionalString.allocationSize(value.`serverName`) +
             FfiConverterString.allocationSize(value.`storageDir`) +
             FfiConverterUInt.allocationSize(value.`outboundConcurrency`) +
             FfiConverterBoolean.allocationSize(value.`trustedNetwork`) +
@@ -1699,6 +1749,7 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
     override fun write(value: NeutrinoConfig, buf: ByteBuffer) {
             FfiConverterString.write(value.`bindAddr`, buf)
             FfiConverterString.write(value.`localpart`, buf)
+            FfiConverterOptionalString.write(value.`serverName`, buf)
             FfiConverterString.write(value.`storageDir`, buf)
             FfiConverterUInt.write(value.`outboundConcurrency`, buf)
             FfiConverterBoolean.write(value.`trustedNetwork`, buf)

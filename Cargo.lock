@@ -680,7 +680,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 [[package]]
 name = "coap"
 version = "0.27.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "ciborium",
@@ -710,7 +710,7 @@ dependencies = [
 [[package]]
 name = "coap-lite"
 version = "0.13.3"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "coap-message 0.2.3",
  "coap-message 0.3.7",
@@ -2932,12 +2932,12 @@ dependencies = [
 [[package]]
 name = "neutrino-ctl"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 
 [[package]]
 name = "neutrino-engine"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "neutrino-event",
@@ -2956,7 +2956,7 @@ dependencies = [
 [[package]]
 name = "neutrino-event"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "base64",
  "ed25519-dalek 2.2.0",
@@ -2971,7 +2971,7 @@ dependencies = [
 [[package]]
 name = "neutrino-ffi"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "neutrino-main",
  "tokio",
@@ -3002,7 +3002,7 @@ dependencies = [
 [[package]]
 name = "neutrino-http"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "axum",
@@ -3028,7 +3028,7 @@ dependencies = [
 [[package]]
 name = "neutrino-lb"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "axum",
@@ -3049,7 +3049,7 @@ dependencies = [
 [[package]]
 name = "neutrino-main"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "hex",
@@ -3070,7 +3070,7 @@ dependencies = [
 [[package]]
 name = "neutrino-room"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "neutrino-event",
  "ruma",
@@ -3082,7 +3082,7 @@ dependencies = [
 [[package]]
 name = "neutrino-store"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "neutrino-event",
@@ -3096,7 +3096,7 @@ dependencies = [
 [[package]]
 name = "neutrino-store-sqlite"
 version = "0.1.0"
-source = "git+https://github.com/element-hq/neutrino?rev=ac8e32a81c9a201018486a6280a08006cabd1af5#ac8e32a81c9a201018486a6280a08006cabd1af5"
+source = "git+https://github.com/element-hq/neutrino?rev=057373b058b7381b60c43e58dbf07b81c9e6a080#057373b058b7381b60c43e58dbf07b81c9e6a080"
 dependencies = [
  "async-trait",
  "deadpool-sqlite",
