@@ -82,4 +82,6 @@ case "$GRADLE_TASK" in
   *publish*) gradle_args+=(--no-configuration-cache) ;;
 esac
 ./gradlew "${gradle_args[@]}"
-[ "$GRADLE_TASK" = ":bindings:assembleRelease" ] && echo "aar: bindings/build/outputs/aar/"
+if [ "$GRADLE_TASK" = ":bindings:assembleRelease" ]; then
+  echo "aar: bindings/build/outputs/aar/"
+fi
