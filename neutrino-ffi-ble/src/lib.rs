@@ -35,8 +35,10 @@ pub(crate) const DISCOVERY_LOCALPART: &str = "n";
 /// Identical contract to `neutrino::start` (spawned runtime, returned control
 /// handle) with the datagram link factory injected: once the entrypoint has
 /// resolved the node secret it binds an iroh endpoint whose id IS that
-/// secret's ed25519 public key, dials peers by 32-byte node id, and (with the
-/// `ble` feature, i.e. on device) discovers + reaches them over the BLE mesh.
+/// secret's ed25519 public key, dials peers by their link address (the
+/// lowercase hex of their 32-byte node id — the peer's `server_name` bytes),
+/// and (with the `ble` feature, i.e. on device) discovers + reaches them over
+/// the BLE mesh.
 #[uniffi::export]
 pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
     // Announce which upstream neutrino this .aar was compiled against (baked in

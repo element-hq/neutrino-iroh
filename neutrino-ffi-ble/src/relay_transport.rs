@@ -4,16 +4,22 @@
 //! iroh-backed [`DatagramLink`] for the low-bandwidth federation transport.
 //!
 //! Carries one CoAP/CBOR datagram per unreliable QUIC datagram between nodes,
-//! keyed by 32-byte node id — no OS socket, no TUN, no virtual IPs. iroh is
-//! confined to this layer; `neutrino-lb` stays iroh-free and speaks only the
-//! [`DatagramLink`] seam (`[u8; 32]` node ids). QUIC datagrams are
-//! per-connection, so the transport keeps a `[u8; 32] → Connection` send-side
-//! table (populated by dialing on egress and by accepting — a connection is
-//! bidirectional, so one accepted from a peer is reused to send back). Every
-//! connection (dialed or accepted) gets a reader task that tags each inbound
-//! datagram with the cryptographically-authenticated remote node id; a reader
-//! removes its own send-side entry when its connection dies, so the next send
-//! re-dials instead of reusing a dead connection.
+//! keyed by the peer's link address — the lowercase 64-hex ASCII of its
+//! 32-byte node id, exactly the `server_name` bytes the egress resolver
+//! renders — no OS socket, no TUN, no virtual IPs. iroh is confined to this
+//! layer; `neutrino-lb` stays iroh-free and speaks only the [`DatagramLink`]
+//! seam (opaque `LinkAddr` byte strings). The hex translation happens only at
+//! that trait boundary: internally everything stays keyed by the raw
+//! `[u8; 32]` node id. QUIC datagrams are per-connection, so the transport
+//! keeps a `[u8; 32] → Connection` send-side table (populated by dialing on
+//! egress and by accepting — a connection is bidirectional, so one accepted
+//! from a peer is reused to send back). Every connection (dialed or accepted)
+//! gets a reader task that tags each inbound datagram with the lowercase hex
+//! of the cryptographically-authenticated remote node id — the ingress
+//! origin↔source gate compares those bytes against the claimed `X-Matrix`
+//! origin verbatim; a reader removes its own send-side entry when its
+//! connection dies, so the next send re-dials instead of reusing a dead
+//! connection.
 //!
 //! The endpoint still binds its own ephemeral loopback UDP socket for QUIC
 //! transport (see [`RELAY_BIND`]); that is iroh-internal and not a peer data
@@ -29,14 +35,15 @@ use bytes::Bytes;
 use iroh::endpoint::presets::Minimal;
 use iroh::endpoint::{Connection, IdleTimeout, QuicTransportConfig, VarInt};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, SecretKey};
-use neutrino_main::{DatagramLink, LinkContext};
+use neutrino_main::{DatagramLink, LinkAddr, LinkContext};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::warn;
 
-/// A node's stable cryptographic identity, as raw public-key bytes — the
-/// [`DatagramLink`] node id. iroh's endpoint id IS these bytes.
+/// A node's stable cryptographic identity, as raw public-key bytes. iroh's
+/// endpoint id IS these bytes; the [`DatagramLink`] address is their lowercase
+/// hex (see [`hex32`]/[`unhex32`]).
 type NodeKey = [u8; 32];
 
 /// UDP bind for the iroh endpoint's QUIC transport. Ephemeral loopback port; on
@@ -110,8 +117,8 @@ fn spawn_readvertise(
     });
 }
 
-/// Lowercase-hex a 32-byte node id → its `server_name` string.
-#[cfg(feature = "ble")]
+/// Lowercase-hex a 32-byte node id → its `server_name` string (whose bytes are
+/// the node's [`DatagramLink`] address).
 fn hex32(bytes: &[u8; 32]) -> String {
     use std::fmt::Write as _;
     let mut s = String::with_capacity(64);
@@ -119,6 +126,38 @@ fn hex32(bytes: &[u8; 32]) -> String {
         let _ = write!(s, "{b:02x}");
     }
     s
+}
+
+/// The inverse of [`hex32`]: parse a [`DatagramLink`] address — exactly 64
+/// lowercase hex ASCII chars — back into the 32-byte node key. Anything else
+/// (wrong length, uppercase, non-hex) is rejected: addresses are canonical
+/// lowercase and compared as exact bytes, so this must not be lenient.
+fn unhex32(addr: &[u8]) -> std::io::Result<NodeKey> {
+    fn nibble(b: u8) -> Option<u8> {
+        match b {
+            b'0'..=b'9' => Some(b - b'0'),
+            b'a'..=b'f' => Some(b - b'a' + 10),
+            _ => None,
+        }
+    }
+    if addr.len() != 64 {
+        return Err(std::io::Error::other(format!(
+            "link: peer address must be the 64-char lowercase hex of a 32-byte node id, got {} bytes",
+            addr.len()
+        )));
+    }
+    let mut key = [0u8; 32];
+    for (byte, pair) in key.iter_mut().zip(addr.chunks_exact(2)) {
+        match (nibble(pair[0]), nibble(pair[1])) {
+            (Some(hi), Some(lo)) => *byte = (hi << 4) | lo,
+            _ => {
+                return Err(std::io::Error::other(
+                    "link: peer address must be lowercase hex (a 32-byte node id)",
+                ));
+            }
+        }
+    }
+    Ok(key)
 }
 
 /// Wall-clock milliseconds since the Unix epoch (0 if the clock is before it).
@@ -164,8 +203,8 @@ pub(crate) struct IrohTransport {
     /// the test seeds loopback addresses. A peer with no entry that has never
     /// dialed us cannot be reached.
     addrs: Mutex<HashMap<NodeKey, EndpointAddr>>,
-    inbound_tx: mpsc::Sender<(NodeKey, Vec<u8>)>,
-    inbound_rx: AsyncMutex<mpsc::Receiver<(NodeKey, Vec<u8>)>>,
+    inbound_tx: mpsc::Sender<(LinkAddr, Vec<u8>)>,
+    inbound_rx: AsyncMutex<mpsc::Receiver<(LinkAddr, Vec<u8>)>>,
     /// The accept-loop task. Aborted on drop so the endpoint (and its UDP
     /// socket) can close — the loop captures only clones, never an `Arc<Self>`,
     /// so it doesn't keep this transport alive (which would leak an endpoint per
@@ -342,20 +381,23 @@ impl IrohTransport {
     /// Drain a connection's datagrams into the inbound queue until it closes,
     /// then drop its send-side entry iff the map still points to *this*
     /// connection — so the next send re-dials and we never evict a newer one.
+    /// Each datagram is tagged with the connection's authenticated remote node
+    /// id as a [`LinkAddr`] (lowercase hex ASCII), encoded once per connection.
     fn spawn_reader(
         peer: NodeKey,
         conn: Connection,
         conns: ConnMap,
-        tx: mpsc::Sender<(NodeKey, Vec<u8>)>,
+        tx: mpsc::Sender<(LinkAddr, Vec<u8>)>,
     ) {
         let conn_id = conn.stable_id();
         tokio::spawn(async move {
+            let src: LinkAddr = hex32(&peer).into_bytes();
             // `read_datagram` errors only on connection close — terminal.
             while let Ok(bytes) = conn.read_datagram().await {
                 // Best-effort: drop rather than block this reader (which would
                 // stall every peer's inbound — head-of-line) when the consumer is
                 // slow to drain. Closed channel = the link is gone → stop.
-                match tx.try_send((peer, bytes.to_vec())) {
+                match tx.try_send((src.clone(), bytes.to_vec())) {
                     Ok(()) => {}
                     Err(mpsc::error::TrySendError::Full(_)) => {
                         tracing::trace!("datagram link: inbound queue full, dropping datagram");
@@ -478,7 +520,7 @@ impl Drop for IrohTransport {
 async fn accept_loop(
     endpoint: Endpoint,
     conns: ConnMap,
-    inbound_tx: mpsc::Sender<(NodeKey, Vec<u8>)>,
+    inbound_tx: mpsc::Sender<(LinkAddr, Vec<u8>)>,
 ) {
     while let Some(incoming) = endpoint.accept().await {
         let conns = conns.clone();
@@ -495,7 +537,7 @@ async fn accept_loop(
 /// Adopt an accepted connection: always read from it (the peer may send on it),
 /// but only take over the send-side route if we have no live connection to this
 /// peer yet — don't clobber an existing one (glare).
-async fn adopt(conn: Connection, conns: ConnMap, inbound_tx: mpsc::Sender<(NodeKey, Vec<u8>)>) {
+async fn adopt(conn: Connection, conns: ConnMap, inbound_tx: mpsc::Sender<(LinkAddr, Vec<u8>)>) {
     let peer = *conn.remote_id().as_bytes();
     {
         let mut map = conns.lock().await;
@@ -512,8 +554,11 @@ async fn adopt(conn: Connection, conns: ConnMap, inbound_tx: mpsc::Sender<(NodeK
 
 #[async_trait]
 impl DatagramLink for IrohTransport {
-    async fn send(&self, dst: NodeKey, datagram: &[u8]) -> std::io::Result<()> {
-        let conn = self.connection(dst).await?;
+    async fn send(&self, dst: &[u8], datagram: &[u8]) -> std::io::Result<()> {
+        // The seam's address is the peer's `server_name` bytes — for this
+        // medium the lowercase hex of its node id. Decode at the boundary;
+        // everything below stays keyed by the raw 32 bytes.
+        let conn = self.connection(unhex32(dst)?).await?;
         conn.send_datagram(Bytes::copy_from_slice(datagram))
             .map_err(|e| {
                 // Loud: a datagram larger than the connection's max datagram size is
@@ -524,7 +569,7 @@ impl DatagramLink for IrohTransport {
             })
     }
 
-    async fn recv(&self) -> Option<(NodeKey, Vec<u8>)> {
+    async fn recv(&self) -> Option<(LinkAddr, Vec<u8>)> {
         self.inbound_rx.lock().await.recv().await
     }
 }
@@ -561,8 +606,9 @@ mod tests {
     }
 
     // Full link flow over real iroh, driving the `DatagramLink` seam directly:
-    // A sends a datagram to B, B receives it tagged with A's authenticated node
-    // id, then B replies A over the reused (accepted) connection. Exercises dial,
+    // A sends a datagram to B's link address (the lowercase hex of B's node
+    // id), B receives it tagged with the hex of A's authenticated node id, then
+    // B replies A over the reused (accepted) connection. Exercises dial,
     // accept, bidirectional reuse, the inbound source tagging, and
     // identity-from-secret.
     #[tokio::test]
@@ -575,31 +621,34 @@ mod tests {
             .await
             .expect("bind B");
 
-        let a_key = a_tp.node_key();
-        let b_key = b_tp.node_key();
-        assert_ne!(a_key, b_key);
+        let a_addr = hex32(&a_tp.node_key()).into_bytes();
+        let b_addr = hex32(&b_tp.node_key()).into_bytes();
+        assert_ne!(a_addr, b_addr);
 
         // A can reach B (the egress/dial path); B learns A on inbound.
         a_tp.add_peer(loopback_addr(&b_tp));
 
         // A → B.
         let to_b = b"hello-b";
-        a_tp.send(b_key, to_b).await.expect("send a->b");
+        a_tp.send(&b_addr, to_b).await.expect("send a->b");
         let (src, got) = timeout(Duration::from_secs(10), b_tp.recv())
             .await
             .expect("B receives in time")
             .expect("B link open");
-        assert_eq!(src, a_key, "datagram tagged with A's authenticated node id");
+        assert_eq!(
+            src, a_addr,
+            "datagram tagged with the hex of A's authenticated node id"
+        );
         assert_eq!(got, to_b);
 
         // B → A, routed via the reused (accepted) connection — B never seeded A.
         let to_a = b"hello-a";
-        b_tp.send(a_key, to_a).await.expect("send b->a");
+        b_tp.send(&a_addr, to_a).await.expect("send b->a");
         let (src, got) = timeout(Duration::from_secs(10), a_tp.recv())
             .await
             .expect("A receives in time")
             .expect("A link open");
-        assert_eq!(src, b_key);
+        assert_eq!(src, b_addr);
         assert_eq!(got, to_a);
     }
 
@@ -611,7 +660,41 @@ mod tests {
         let tp = IrohTransport::bind(test_ctx([3u8; 32]), loopback)
             .await
             .expect("bind");
-        assert!(tp.send([9u8; 32], b"x").await.is_err());
+        assert!(tp.send(hex32(&[9u8; 32]).as_bytes(), b"x").await.is_err());
+    }
+
+    // The seam's address is exactly 64 lowercase hex chars; anything else is
+    // rejected at the trait boundary, before any dial is attempted.
+    #[tokio::test]
+    async fn send_to_malformed_address_is_an_error() {
+        let loopback: SocketAddr = "127.0.0.1:0".parse().expect("loopback");
+        let tp = IrohTransport::bind(test_ctx([4u8; 32]), loopback)
+            .await
+            .expect("bind");
+        let uppercase = hex32(&[9u8; 32]).to_uppercase();
+        for addr in [
+            &b""[..],             // empty
+            b"abc123",            // too short
+            &[b'a'; 63],          // one short
+            &[b'a'; 65],          // one long
+            uppercase.as_bytes(), // not canonical lowercase
+            &[b'g'; 64],          // right length, not hex
+        ] {
+            assert!(
+                tp.send(addr, b"x").await.is_err(),
+                "address {addr:?} must be rejected"
+            );
+        }
+    }
+
+    // `unhex32` is the exact inverse of `hex32` on every byte value.
+    #[test]
+    fn unhex32_inverts_hex32() {
+        let mut key = [0u8; 32];
+        for (i, b) in key.iter_mut().enumerate() {
+            *b = (i * 8 + 7) as u8; // covers low/high nibble variety incl. 0xff
+        }
+        assert_eq!(unhex32(hex32(&key).as_bytes()).expect("round-trip"), key);
     }
 
     // Load-bearing cross-layer invariant: the link's `node_key` (iroh endpoint
