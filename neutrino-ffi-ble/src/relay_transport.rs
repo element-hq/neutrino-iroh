@@ -35,7 +35,7 @@ use bytes::Bytes;
 use iroh::endpoint::presets::Minimal;
 use iroh::endpoint::{Connection, IdleTimeout, QuicTransportConfig, VarInt};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, SecretKey};
-use neutrino_main::{DatagramLink, LinkAddr, LinkContext};
+use neutrino_main::{DatagramLink, LinkAddr, LinkContext, LinkProfile};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -571,6 +571,21 @@ impl DatagramLink for IrohTransport {
 
     async fn recv(&self) -> Option<(LinkAddr, Vec<u8>)> {
         self.inbound_rx.lock().await.recv().await
+    }
+
+    fn profile(&self) -> LinkProfile {
+        LinkProfile {
+            // Declared so block derivation yields 512 B Q-Blocks — NOT the
+            // link's true datagram capability. This medium has no LinkCodec,
+            // so the full uncompressed federation options ride every block:
+            // with the default 1280 B profile the derivation picks 1024 B
+            // blocks, and 1024 + real options overflows coap-lite's 1280 B
+            // message cap — the historical silent send stall. 512 + options
+            // stays comfortably under it. (1024 derives 512 both before and
+            // after neutrino dropped its fixed option budget.)
+            max_datagram: 1024,
+            ..LinkProfile::default()
+        }
     }
 }
 
