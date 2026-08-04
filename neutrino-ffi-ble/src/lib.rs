@@ -43,8 +43,10 @@ pub(crate) const DISCOVERY_LOCALPART: &str = "n";
 pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
     // Announce which upstream neutrino this .aar was compiled against (baked in
     // by build.rs from the lockfile). Install the logcat subscriber first so the
-    // line is not dropped — idempotent, and start_with installs it again.
-    neutrino_main::init_tracing();
+    // line is not dropped — idempotent, and start_with installs it again. Pass
+    // the host's log directory through: whichever call runs first wins, so
+    // omitting it here would leave the on-disk sink permanently uninstalled.
+    neutrino_main::init_tracing(config.log_dir.as_deref().map(std::path::Path::new));
     tracing::info!(
         neutrino_commit = env!("NEUTRINO_COMMIT"),
         "neutrino BLE medium starting"
