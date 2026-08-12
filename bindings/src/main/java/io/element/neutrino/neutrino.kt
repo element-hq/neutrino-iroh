@@ -1280,11 +1280,14 @@ public interface NeutrinoHandleInterface {
     fun `shutdown`()
     
     /**
-     * Start mirroring every federation datagram into a Wireshark-readable pcap
-     * at `path` (an absolute path in host-owned storage, e.g. app-specific
-     * external storage so it is `adb pull`-able). Errors if the file can't be
-     * opened. Calling it while already capturing rotates to the new file. A
-     * non-blocking control call, safe from the FFI/JNI thread.
+     * Start mirroring every federation HTTP request/response into a
+     * Wireshark-readable pcap at `path` (an absolute path in host-owned
+     * storage, e.g. app-specific external storage so it is `adb pull`-able).
+     * The capture is HTTP/JSON — what a `tcpdump -i lo` on a desktop would
+     * have shown of the two loopback legs, which Android cannot capture
+     * itself. Errors if the file can't be opened. Calling it while already
+     * capturing rotates to the new file. A non-blocking control call, safe
+     * from the FFI/JNI thread.
      */
     fun `startCapture`(`path`: kotlin.String)
     
@@ -1530,11 +1533,14 @@ open class NeutrinoHandle: Disposable, AutoCloseable, NeutrinoHandleInterface
 
     
     /**
-     * Start mirroring every federation datagram into a Wireshark-readable pcap
-     * at `path` (an absolute path in host-owned storage, e.g. app-specific
-     * external storage so it is `adb pull`-able). Errors if the file can't be
-     * opened. Calling it while already capturing rotates to the new file. A
-     * non-blocking control call, safe from the FFI/JNI thread.
+     * Start mirroring every federation HTTP request/response into a
+     * Wireshark-readable pcap at `path` (an absolute path in host-owned
+     * storage, e.g. app-specific external storage so it is `adb pull`-able).
+     * The capture is HTTP/JSON — what a `tcpdump -i lo` on a desktop would
+     * have shown of the two loopback legs, which Android cannot capture
+     * itself. Errors if the file can't be opened. Calling it while already
+     * capturing rotates to the new file. A non-blocking control call, safe
+     * from the FFI/JNI thread.
      */
     @Throws(CaptureException::class)override fun `startCapture`(`path`: kotlin.String)
         = 
@@ -1608,7 +1614,7 @@ public object FfiConverterTypeNeutrinoHandle: FfiConverter<NeutrinoHandle, Long>
 
 /**
  * A peer the embedded server has discovered out of band (over the federation
- * medium's scan or the LAN mDNS browser), for the host to render in a
+ * medium's scan), for the host to render in a
  * Settings directory. Host-facing projection of
  * `neutrino_ctl::DiscoveredPeer` plus its `server_name` key; the localpart is
  * omitted (the host builds user ids itself from `server_name`).
@@ -1670,8 +1676,9 @@ public object FfiConverterTypeDiscoveredPeer: FfiConverterRustBuffer<DiscoveredP
  * FFI-facing server configuration. Mirrors `neutrino_ctl::Config` so EX
  * Android can fully configure the embedded homeserver. Kept here (not on the
  * common `Config`) so UniFFI stays out of the common crates — see the
- * crate-structure rule in CLAUDE.md. All fields are required; defaults live
- * in `Config::default`/`from_env` for the dev binary.
+ * crate-structure rule in CLAUDE.md. Fields are required unless marked with a
+ * `uniffi` default; the dev binary's defaults live in
+ * `Config::default`/`from_env`.
  */
 data class NeutrinoConfig (
     var `bindAddr`: kotlin.String
@@ -1710,6 +1717,26 @@ data class NeutrinoConfig (
      * federation (no in-process sidecar).
      */
     var `lbFederationPort`: kotlin.UShort?
+    , 
+    /**
+     * Absolute path to a directory the server writes rotating `neutrino.*` log
+     * files into, on top of logcat. Android's logcat is a small ring buffer
+     * that also drops lines from chatty UIDs, so a bug report filed minutes
+     * after a failure has already lost it; point this at the host's bug-report
+     * log directory to keep a day of history that the report can upload. The
+     * server creates the directory if missing. `None` = logcat only.
+     */
+    var `logDir`: kotlin.String? = null 
+    , 
+    /**
+     * Whether `/sync` surfaces synthesised delivery receipts: an `m.read`
+     * receipt for a remote user once that user's server has acknowledged the
+     * federation transaction carrying the event. It is a deliberate lie —
+     * their server *received* it, nobody read it — so it is off unless the
+     * host (or the medium's own start wrapper) asks for it. Defaulted so
+     * existing callers are unaffected.
+     */
+    var `deliveryReceipts`: kotlin.Boolean = false 
     
 ){
     
@@ -1733,6 +1760,8 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterUInt.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalUShort.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -1743,7 +1772,9 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterString.allocationSize(value.`storageDir`) +
             FfiConverterUInt.allocationSize(value.`outboundConcurrency`) +
             FfiConverterBoolean.allocationSize(value.`trustedNetwork`) +
-            FfiConverterOptionalUShort.allocationSize(value.`lbFederationPort`)
+            FfiConverterOptionalUShort.allocationSize(value.`lbFederationPort`) +
+            FfiConverterOptionalString.allocationSize(value.`logDir`) +
+            FfiConverterBoolean.allocationSize(value.`deliveryReceipts`)
     )
 
     override fun write(value: NeutrinoConfig, buf: ByteBuffer) {
@@ -1754,6 +1785,8 @@ public object FfiConverterTypeNeutrinoConfig: FfiConverterRustBuffer<NeutrinoCon
             FfiConverterUInt.write(value.`outboundConcurrency`, buf)
             FfiConverterBoolean.write(value.`trustedNetwork`, buf)
             FfiConverterOptionalUShort.write(value.`lbFederationPort`, buf)
+            FfiConverterOptionalString.write(value.`logDir`, buf)
+            FfiConverterBoolean.write(value.`deliveryReceipts`, buf)
     }
 }
 

@@ -229,6 +229,7 @@ impl IrohTransport {
             display_name: name_rx,
             discovery,
             commands,
+            ..
         } = ctx;
         #[cfg(not(feature = "ble"))]
         let _ = (name_rx, discovery, commands);

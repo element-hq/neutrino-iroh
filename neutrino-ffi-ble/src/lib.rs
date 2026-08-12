@@ -60,11 +60,13 @@ pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
     let factory: neutrino_main::FederationLinkFactory = Box::new(move |ctx| {
         Box::pin(async move {
             let transport = IrohTransport::bind(ctx, RELAY_BIND).await?;
-            Ok(neutrino_main::FederationLink {
-                link: transport as std::sync::Arc<dyn neutrino_main::DatagramLink>,
-                key_resolver: Some(std::sync::Arc::new(neutrino_main::NodeIdKeyResolver)),
-            })
+            Ok(neutrino_main::FederationLink::new(
+                transport as std::sync::Arc<dyn neutrino_main::DatagramLink>,
+            )
+            .with_key_resolver(std::sync::Arc::new(neutrino_main::NodeIdKeyResolver)))
         })
     });
-    neutrino::start_with(config, Some(factory))
+    // No store handle: this medium declares no room version, so it keeps no
+    // persistent state of its own and lets neutrino open the store.
+    neutrino::start_with(config, None, Some(factory))
 }
