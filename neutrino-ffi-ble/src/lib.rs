@@ -66,7 +66,8 @@ pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
             .with_key_resolver(std::sync::Arc::new(neutrino_main::NodeIdKeyResolver)))
         })
     });
-    // No store handle: this medium declares no room version, so it keeps no
-    // persistent state of its own and lets neutrino open the store.
-    neutrino::start_with(config, None, Some(factory))
+    // No runtime and no store: this medium declares no room version, so it keeps
+    // no persistent state of its own and needs neither handle before the call —
+    // neutrino builds the runtime and opens the store itself.
+    neutrino::start_with(config, None, None, Some(factory))
 }
