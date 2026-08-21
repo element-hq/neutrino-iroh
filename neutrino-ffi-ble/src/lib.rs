@@ -40,7 +40,8 @@ pub(crate) const DISCOVERY_LOCALPART: &str = "n";
 /// and (with the `ble` feature, i.e. on device) discovers + reaches them over
 /// the BLE mesh.
 #[uniffi::export]
-pub fn start_ble(config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
+pub fn start_ble(mut config: neutrino::NeutrinoConfig) -> neutrino::NeutrinoHandle {
+    config.delivery_receipts = true;
     // Announce which upstream neutrino this .aar was compiled against (baked in
     // by build.rs from the lockfile). Install the logcat subscriber first so the
     // line is not dropped — idempotent, and start_with installs it again. Pass
