@@ -19,7 +19,7 @@ cd "$(dirname "$0")"
 # (the resolved sha after '#', not the requested `rev`, which may be short or a
 # tag). Baked into the published POM via -PneutrinoCommit and echoed, so every
 # build — local or CI — records which upstream neutrino it was compiled with.
-NEUTRINO_COMMIT="$(grep -oE 'github\.com/element-hq/neutrino[^#]*#[0-9a-f]{40}' Cargo.lock | grep -oE '[0-9a-f]{40}$' | head -1)"
+NEUTRINO_COMMIT="$(grep -oE 'github\.com/element-hq/neutrino[^#]*#[0-9a-f]{40}' Cargo.lock | grep -oE '[0-9a-f]{40}$' | head -1 || true)"
 echo "neutrino commit: ${NEUTRINO_COMMIT:-unknown}"
 
 ABIS=(${ABIS:-armeabi-v7a arm64-v8a x86 x86_64})
