@@ -400,6 +400,9 @@ object BlePeripheralManager {
 
     private var advertiseCallback: AdvertiseCallback? = null
 
+    // `name` is ignored: Android can only advertise the adapter's name, and
+    // setting it renames the phone system-wide.
+    @Suppress("UNUSED_PARAMETER")
     @JvmStatic
     fun startAdvertising(
         name: String,
@@ -417,8 +420,6 @@ object BlePeripheralManager {
                 Log.e(TAG, "advertiser not available")
                 return
             }
-
-        bluetoothManager?.adapter?.name = name
 
         if (manufacturerData != null && manufacturerId >= 0) {
             startExtendedAdvertising(adv, serviceUuids, manufacturerId, manufacturerData)
