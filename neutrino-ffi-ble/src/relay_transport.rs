@@ -147,8 +147,8 @@ fn unhex32(addr: &[u8]) -> std::io::Result<NodeKey> {
         )));
     }
     let mut key = [0u8; 32];
-    for (byte, pair) in key.iter_mut().zip(addr.chunks_exact(2)) {
-        match (nibble(pair[0]), nibble(pair[1])) {
+    for (byte, &[high, low]) in key.iter_mut().zip(addr.as_chunks::<2>().0) {
+        match (nibble(high), nibble(low)) {
             (Some(hi), Some(lo)) => *byte = (hi << 4) | lo,
             _ => {
                 return Err(std::io::Error::other(
