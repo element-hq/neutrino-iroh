@@ -55,3 +55,7 @@ google-services.json
 
 # Complement: tarball-extracted upstream checkouts (see scripts/complement.sh)
 /complement-*/
+
+# iOS build outputs (see build-xcframework.sh)
+/ios/NeutrinoFFI.xcframework/
+/ios/Sources/
