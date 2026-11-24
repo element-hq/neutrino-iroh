@@ -12,7 +12,7 @@ license.workspace = true
 # lib target ("neutrino") — duplicate lib names in one dependency graph
 # collide. neutrino-ffi's own cdylib is not built here (cargo builds only the
 # rlib of a path dependency), so the .so in this workspace is only ever ours.
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 name = "neutrino_ble"
 
 [dependencies]

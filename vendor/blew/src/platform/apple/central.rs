@@ -30,7 +30,8 @@ use objc2::{AnyThread, DefinedClass};
 use objc2_core_bluetooth::CBCentralManagerOptionRestoreIdentifierKey;
 use objc2_core_bluetooth::CBCentralManagerRestoredStatePeripheralsKey;
 use objc2_core_bluetooth::{
-    CBAdvertisementDataLocalNameKey, CBAdvertisementDataServiceUUIDsKey, CBCentralManager,
+    CBAdvertisementDataLocalNameKey, CBAdvertisementDataManufacturerDataKey,
+    CBAdvertisementDataServiceUUIDsKey, CBCentralManager,
     CBCentralManagerDelegate, CBCharacteristic, CBCharacteristicProperties,
     CBCharacteristicWriteType, CBError, CBErrorDomain, CBL2CAPChannel, CBManagerState,
     CBPeripheral, CBPeripheralDelegate, CBService, CBUUID,
@@ -189,14 +190,23 @@ define_class!(
                 })
                 .unwrap_or_default();
 
+            // CoreBluetooth hands over the raw AD payload: a little-endian
+            // company id followed by the manufacturer bytes.
+            let manufacturer_data = advertisement_data
+                .objectForKey(CBAdvertisementDataManufacturerDataKey)
+                .and_then(|obj| {
+                    let bytes = (*obj).downcast_ref::<NSData>()?.to_vec();
+                    let (company, data) = bytes.split_first_chunk::<2>()?;
+                    Some((u16::from_le_bytes(*company), data.to_vec()))
+                });
+
             let rssi_val = rssi.integerValue() as i16;
             let device = BleDevice {
                 id: id.clone(),
                 name,
                 rssi: Some(rssi_val),
                 services,
-
-                manufacturer_data: None,
+                manufacturer_data,
             };
             debug!(device_id = %id, name = ?device.name, rssi = rssi_val, "device discovered");
             let inner = self.ivars();
